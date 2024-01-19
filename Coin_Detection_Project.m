@@ -1,3 +1,10 @@
+%% Code written by Ibrahim Haroon
+%ibrahimharoon258@gmail.com
+
+
+%% Start Program
+
+
 % List of available coin image filenames and their corresponding names
 coinImages = {
     'coinImage.png', 'Coin Image';
@@ -6,11 +13,13 @@ coinImages = {
     'testCoinImage3.png', 'Test Coin Image 3'
 };
 
+% Display a menu for the user to choose a coin image
 fprintf('Select a coin image:\n');
 for i = 1:size(coinImages, 1)
     fprintf('%d. %s - %s\n', i, coinImages{i, 1}, coinImages{i, 2});
 end
 
+% Get user input for the image choice with error handling
 while true
     try
         choice = input('Enter the number of the image you want to load (1-4): ');
@@ -26,6 +35,7 @@ while true
     end
 end
 
+% Initialize counters for coin denominations and valid/invalid coins
 cents_50 = 0;
 cents_25 = 0;
 cents_5 = 0;
@@ -33,44 +43,49 @@ cents_10 = 0;
 v_coins = 0;  
 iv_coins = 0;  
 
+% Apply Gaussian smoothing to the loaded image
 sigma = 3;
 image = imgaussfilt(imageip, sigma);
 
+% Segment the image to identify invalid coins
+iv_img = segmentImage1(image);
+iv_c = regionprops('table', iv_img, 'Centroid', 'BoundingBox', 'EquivDiameter');
 
-iv_img=segmentImage1(image);
-iv_c = regionprops('table',iv_img, 'Centroid', 'BoundingBox', 'EquivDiameter');
+% Segment the image to identify all coins
+v_img = segmentImage2(image);
+all_c = regionprops('table', v_img, 'Centroid', 'BoundingBox', 'EquivDiameter');
 
-v_img=segmentImage2(image);
-all_c = regionprops('table',v_img, 'Centroid', 'BoundingBox', 'EquivDiameter');
-    
-
+% Highlight the identified coins on the original image
 out_img = insertShape(imageip, 'Rectangle', all_c.BoundingBox, 'LineWidth', 3);
 
+% Iterate through all identified coins and classify them
 for i = 1:size(all_c.Centroid, 1)
     centers = all_c.Centroid(i, :);
     
     % Initialize a flag to indicate if the current coin is invalid
     is_iv = false;
     
-    % Loop through centroids_invalid and check the distance to each one
+    % Check the distance to each invalid coin's centroid
     for j = 1:size(iv_c.Centroid, 1)
         distance = norm(iv_c.Centroid(j, :) - centers);
         
         % If the distance is within the tolerance, mark the coin as invalid
-        if distance <= 4 %4 is tolerance set by myself
+        if distance <= 4 % 4 is tolerance set by myself
             is_iv = true;
-            break;  % No need to check other
+            break;  % No need to check other invalid coins
         end
     end
     
+    % Update counters and highlight the coins on the output image
     if is_iv
-        iv_coins = iv_coins + 1;  % Increment invalid coin count
+        iv_coins = iv_coins + 1;
         out_img = insertShape(out_img, 'Rectangle', all_c.BoundingBox(i, :), 'Color', 'red', 'LineWidth', 3);
     else
         v_coins = v_coins + 1;  
         diameter = all_c.EquivDiameter(i);
 
-         if diameter >= 125 && diameter <= 200
+        % Classify coins based on diameter ranges
+        if diameter >= 125 && diameter <= 200
             cents_50 = cents_50 + 1;
         elseif diameter >= 95 && diameter <= 101
             cents_25 = cents_25 + 1;
@@ -80,13 +95,16 @@ for i = 1:size(all_c.Centroid, 1)
             cents_10 = cents_10 + 1;
         end
 
+        % Highlight valid coins on the output image
         out_img = insertShape(out_img, 'Rectangle', all_c.BoundingBox(i, :), 'Color', 'green', 'LineWidth', 3);
     end
 end
-   total_usd = (cents_50 * 0.5) + (cents_25 * 0.25) + (cents_5 * 0.05) + (cents_10 * 0.1); 
-   imshow(out_img);
 
-% Display counts and total USD value
+% Calculate the total USD value based on coin counts
+total_usd = (cents_50 * 0.5) + (cents_25 * 0.25) + (cents_5 * 0.05) + (cents_10 * 0.1);
+
+% Display the final result, including counts and total USD value
+imshow(out_img);
 fprintf('Counts:\n');
 fprintf('Number of Valid Coins: %d\n', v_coins);
 fprintf('Number of Invalid Coins: %d\n', iv_coins);
@@ -95,7 +113,6 @@ fprintf('25 Cent Coins: %d\n', cents_25);
 fprintf('5 Cent Coins: %d\n', cents_5);
 fprintf('10 Cent Coins: %d\n', cents_10);
 fprintf('Total USD Value = %.2f $ \n', total_usd);
-
 
 function [BW,maskedImage] = segmentImage1(X)
 %segmentImage Segment image using auto-generated code from imageSegmenter app
